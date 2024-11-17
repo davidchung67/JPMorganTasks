@@ -1,0 +1,104 @@
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
+
+# Path to the uploaded CSV file
+file_path = '/Users/david/Downloads/Nat_Gas.csv'
+
+def preprocess_data(file_path):
+    # Load the data
+    data = pd.read_csv(file_path)
+
+    # Ensure the dates are in datetime format
+    data['Dates'] = pd.to_datetime(data['Dates'], format='%m/%d/%y')
+
+    # Sort the data by date in case it's not sorted
+    data = data.sort_values('Dates')
+
+    return data
+
+def visualize_data(data):
+    plt.figure(figsize=(10, 6))
+    plt.plot(data['Dates'], data['Prices'], marker='o', label='Observed Prices')
+    plt.xlabel('Date')
+    plt.ylabel('Natural Gas Price')
+    plt.title('Natural Gas Prices Over Time')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+def extrapolate_prices(data, future_months=12):
+    # Convert dates to ordinal numbers for modeling
+    data['Ordinal'] = data['Dates'].map(datetime.toordinal)
+
+    # Prepare the features (X) and target (y)
+    X = data[['Ordinal']]
+    y = data['Prices']
+
+    # Fit a linear regression model
+    model = LinearRegression()
+    model.fit(X, y)
+
+    # Generate future dates
+    last_date = data['Dates'].iloc[-1]
+    future_dates = [last_date + timedelta(days=30 * i) for i in range(1, future_months + 1)]
+
+    # Convert future dates to ordinal numbers
+    future_ordinal = [date.toordinal() for date in future_dates]
+
+    # Predict future prices
+    future_prices = model.predict(np.array(future_ordinal).reshape(-1, 1))
+
+    # Create a DataFrame for future predictions
+    future_data = pd.DataFrame({
+        'Dates': future_dates,
+        'Prices': future_prices
+    })
+
+    return future_data
+
+def predict_price(data, target_date):
+    # Ensure target_date is in datetime format
+    target_date = pd.to_datetime(target_date)
+
+    # Convert target_date to ordinal
+    target_ordinal = np.array([[target_date.toordinal()]])
+
+    # Fit the model again
+    data['Ordinal'] = data['Dates'].map(datetime.toordinal)
+    X = data[['Ordinal']]
+    y = data['Prices']
+
+    model = LinearRegression()
+    model.fit(X, y)
+
+    # Predict the price for the target date
+    predicted_price = model.predict(target_ordinal)
+    return predicted_price[0]
+
+# Load and preprocess data
+data = preprocess_data(file_path)
+
+# Visualize the historical data
+visualize_data(data)
+
+# Extrapolate for the next 12 months
+future_data = extrapolate_prices(data, future_months=12)
+
+# Visualize future extrapolation
+plt.figure(figsize=(10, 6))
+plt.plot(data['Dates'], data['Prices'], marker='o', label='Observed Prices')
+plt.plot(future_data['Dates'], future_data['Prices'], marker='x', linestyle='--', label='Extrapolated Prices')
+plt.xlabel('Date')
+plt.ylabel('Natural Gas Price')
+plt.title('Natural Gas Price Prediction')
+plt.legend()
+plt.grid()
+plt.show()
+
+# Predict price for a specific date (example)
+target_date = '2025-01-01'  # Replace this with the desired date
+predicted_price = predict_price(data, target_date)
+print(f"Predicted price on {target_date}: {predicted_price:.2f}")
